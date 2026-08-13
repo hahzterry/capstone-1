@@ -1,0 +1,309 @@
+:root {
+  --bg: #f6f6f4;
+  --panel: #ffffff;
+  --line: #e2e0da;
+  --text: #1c1b19;
+  --muted: #6f6b63;
+  --accent: #1f5f4b;
+  --danger: #a33b2b;
+  --warn: #8a6a1f;
+
+  color-scheme: light;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.subtitle,
+.location,
+.hint,
+.empty,
+.muted,
+footer p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.wallet {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.balance {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning {
+  color: var(--warn);
+  font-size: 13px;
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+input {
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  min-width: 0;
+  flex: 1;
+}
+
+input:disabled {
+  background: #f1efea;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.banner.pending {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.banner.success {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.banner.error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.banner a {
+  color: inherit;
+}
+
+.listing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.listing-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.listing-head h2 {
+  margin: 0;
+}
+
+.filter {
+  max-width: 260px;
+}
+
+.home header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.id {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.tag.sale {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tag.rent {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.tag.leased {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.tag.you {
+  background: #ecebe6;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.facts dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 3px 0 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.landlord {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.landlord .hint {
+  margin-bottom: 10px;
+}
+
+.empty {
+  padding: 20px;
+  text-align: center;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+a {
+  color: var(--accent);
+}
+
+@media (max-width: 560px) {
+  .tokenize .row,
+  .listing-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter {
+    max-width: none;
+  }
+}
