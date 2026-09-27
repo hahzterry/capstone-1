@@ -1,29 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Address, Hash } from "viem";
-
 import { HomeCard } from "./components/HomeCard";
 import { TokenizeForm } from "./components/TokenizeForm";
 import { TxBanner, type TxState } from "./components/TxBanner";
 import { WalletBar } from "./components/WalletBar";
-
 import { arcChain, addressUrl } from "./lib/chain";
 import {
   getWalletClient,
   hasWallet,
   publicClient,
 } from "./lib/clients";
-
 import {
   homeRegistry,
   homeRegistryAddress,
   isDeployed,
 } from "./lib/contract";
-
 import type { Home, HomeView } from "./lib/contract";
-
 import { readableError } from "./lib/errors";
 import { parseUsdc } from "./lib/format";
-
 export default function App() {
   const [account, setAccount] = useState<Address>();
   const [chainId, setChainId] = useState<number>();
@@ -33,17 +27,13 @@ export default function App() {
   const [loadError, setLoadError] = useState<string>();
   const [filter, setFilter] = useState("");
   const [tx, setTx] = useState<TxState>({ status: "idle" });
-
   const busy = tx.status === "pending";
-
   const onArc = chainId === arcChain.id;
-
   const canWrite =
     Boolean(account) &&
     onArc &&
     isDeployed &&
     !busy;
-
   /**
    * Load every home from HomeRegistry.
    */
@@ -53,52 +43,76 @@ export default function App() {
       setLoading(false);
       return;
     }
-
     setLoading(true);
-
+    setLoadError(undefined);
     try {
       const count = await publicClient.readContract({
         ...homeRegistry,
         functionName: "homeCount",
       });
-
       const homeCount = Number(count);
-
       if (homeCount === 0) {
         setHomes([]);
-        setLoadError(undefined);
         return;
       }
-
       const ids = Array.from(
         { length: homeCount },
         (_, index) => BigInt(index + 1),
       );
-
       const loaded = await Promise.all(
         ids.map(async (id): Promise<HomeView> => {
-          const home = (await publicClient.readContract({
+          const result = await publicClient.readContract({
             ...homeRegistry,
             functionName: "getHome",
             args: [id],
-          })) as Home;
-
+          });
+          /**
+           * Viem returns Solidity tuples as readonly arrays.
+           *
+           * Convert the tuple into the application's Home
+           * object explicitly instead of using an unsafe cast.
+           */
+          const [
+            owner,
+            leaseEnd,
+            forSale,
+            forRent,
+            tenant,
+            salePrice,
+            rentPrice,
+            name,
+            location,
+            threeWordAddress,
+            metadataURI,
+            tiktokURL,
+          ] = result;
+          const home: Home = {
+            owner,
+            leaseEnd,
+            forSale,
+            forRent,
+            tenant,
+            salePrice,
+            rentPrice,
+            name,
+            location,
+            threeWordAddress,
+            metadataURI,
+            tiktokURL,
+          };
           return {
             id,
             ...home,
           };
         }),
       );
-
       setHomes(loaded.reverse());
-      setLoadError(undefined);
     } catch (error) {
       setLoadError(readableError(error));
     } finally {
       setLoading(false);
     }
   }, []);
-
   /**
    * Read the connected wallet's native USDC balance.
    *
@@ -110,34 +124,27 @@ export default function App() {
       setBalance(undefined);
       return;
     }
-
     try {
       const nextBalance = await publicClient.getBalance({
         address: account,
       });
-
       setBalance(nextBalance);
     } catch {
       setBalance(undefined);
     }
   }, [account, onArc]);
-
   useEffect(() => {
     void loadHomes();
   }, [loadHomes]);
-
   useEffect(() => {
     void refreshBalance();
   }, [refreshBalance]);
-
   /**
    * Follow an already-connected injected wallet.
    */
   useEffect(() => {
     if (!hasWallet()) return;
-
     const wallet = getWalletClient();
-
     void wallet
       .getAddresses()
       .then(([first]) => {
@@ -146,46 +153,34 @@ export default function App() {
       .catch(() => {
         setAccount(undefined);
       });
-
     void wallet
       .getChainId()
       .then(setChainId)
       .catch(() => {
         setChainId(undefined);
       });
-
     const provider = window.ethereum;
-
     if (!provider) return;
-
     const onAccounts = (accounts: Address[]) => {
       setAccount(accounts[0]);
     };
-
     const onChain = (id: string) => {
       setChainId(Number.parseInt(id, 16));
     };
-
     provider.on("accountsChanged", onAccounts);
     provider.on("chainChanged", onChain);
-
     return () => {
       provider.removeListener("accountsChanged", onAccounts);
       provider.removeListener("chainChanged", onChain);
     };
   }, []);
-
   async function connect() {
     try {
       const wallet = getWalletClient();
-
       const [address] = await wallet.requestAddresses();
-
       setAccount(address);
-
       const nextChainId = await wallet.getChainId();
       setChainId(nextChainId);
-
       if (nextChainId !== arcChain.id) {
         await switchToArc();
       }
@@ -197,11 +192,9 @@ export default function App() {
       });
     }
   }
-
   async function switchToArc() {
     try {
       const wallet = getWalletClient();
-
       try {
         await wallet.switchChain({
           id: arcChain.id,
@@ -215,14 +208,11 @@ export default function App() {
         await wallet.addChain({
           chain: arcChain,
         });
-
         await wallet.switchChain({
           id: arcChain.id,
         });
       }
-
       const nextChainId = await wallet.getChainId();
-
       setChainId(nextChainId);
     } catch (error) {
       setTx({
@@ -232,7 +222,6 @@ export default function App() {
       });
     }
   }
-
   /**
    * Execute a wallet transaction, wait for confirmation,
    * refresh the property list and wallet balance.
@@ -247,49 +236,39 @@ export default function App() {
         label,
         message: "Connect your wallet first.",
       });
-
       return;
     }
-
     if (!onArc) {
       setTx({
         status: "error",
         label,
         message: `Switch your wallet to ${arcChain.name} first.`,
       });
-
       return;
     }
-
     if (!isDeployed) {
       setTx({
         status: "error",
         label,
         message: "HomeRegistry is not configured.",
       });
-
       return;
     }
-
     setTx({
       status: "pending",
       label,
     });
-
     try {
       const hash = await run(account);
-
       setTx({
         status: "pending",
         label,
         hash,
       });
-
       const receipt =
         await publicClient.waitForTransactionReceipt({
           hash,
         });
-
       if (receipt.status !== "success") {
         setTx({
           status: "error",
@@ -297,16 +276,13 @@ export default function App() {
           message: "The transaction reverted on chain.",
           hash,
         });
-
         return;
       }
-
       setTx({
         status: "success",
         label,
         hash,
       });
-
       await Promise.all([
         loadHomes(),
         refreshBalance(),
@@ -319,7 +295,6 @@ export default function App() {
       });
     }
   }
-
   /**
    * Register a new home.
    *
@@ -352,10 +327,8 @@ export default function App() {
           ],
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const listForSale = (
     id: bigint,
     price: string,
@@ -368,10 +341,8 @@ export default function App() {
           args: [id, parseUsdc(price)],
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const listForRent = (
     id: bigint,
     price: string,
@@ -384,10 +355,8 @@ export default function App() {
           args: [id, parseUsdc(price)],
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const delist = (id: bigint) =>
     send(`Delisting home #${id}`, async (from) => {
       const { request } =
@@ -397,10 +366,8 @@ export default function App() {
           args: [id],
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const buy = (home: HomeView) =>
     send(`Buying home #${home.id}`, async (from) => {
       const { request } =
@@ -411,10 +378,8 @@ export default function App() {
           value: home.salePrice,
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const rent = (home: HomeView) =>
     send(`Renting home #${home.id}`, async (from) => {
       const { request } =
@@ -425,10 +390,8 @@ export default function App() {
           value: home.rentPrice,
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const payRent = (home: HomeView) =>
     send(
       `Paying rent on home #${home.id}`,
@@ -441,11 +404,9 @@ export default function App() {
             value: home.rentPrice,
             account: from,
           });
-
         return getWalletClient().writeContract(request);
       },
     );
-
   const endLease = (id: bigint) =>
     send(`Ending the lease on home #${id}`, async (from) => {
       const { request } =
@@ -455,25 +416,19 @@ export default function App() {
           args: [id],
           account: from,
         });
-
       return getWalletClient().writeContract(request);
     });
-
   const visible = useMemo(() => {
     const query = filter.trim();
-
     if (!query) {
       return homes;
     }
-
     if (/^\d+$/.test(query)) {
       return homes.filter(
         (home) => home.id === BigInt(query),
       );
     }
-
     const needle = query.toLowerCase();
-
     return homes.filter(
       (home) =>
         home.name.toLowerCase().includes(needle) ||
@@ -483,7 +438,6 @@ export default function App() {
           .includes(needle),
     );
   }, [homes, filter]);
-
   /**
    * The wallet bar's Add Funds button is intentionally kept
    * as a UI hook until the Circle session endpoint is wired
@@ -497,18 +451,15 @@ export default function App() {
         "Funding is not configured yet. Connect Circle Onramp before using Add Funds.",
     });
   }, []);
-
   return (
     <div className="app">
       <header className="topbar">
         <div>
           <h1>Home RWA</h1>
-
           <p className="subtitle">
             Discover homes through video. Rent or buy directly on Arc.
           </p>
         </div>
-
         <WalletBar
           account={account}
           balance={balance}
@@ -519,9 +470,7 @@ export default function App() {
           onAddFunds={addFunds}
         />
       </header>
-
       <TxBanner tx={tx} />
-
       {!isDeployed && (
         <div className="banner error">
           <span>
@@ -530,7 +479,6 @@ export default function App() {
           </span>
         </div>
       )}
-
       {isDeployed && (
         <div className="network-info">
           <span>{arcChain.name}</span>
@@ -539,7 +487,6 @@ export default function App() {
           </span>
         </div>
       )}
-
       {!hasWallet() && (
         <div className="banner error">
           <span>
@@ -549,14 +496,12 @@ export default function App() {
           </span>
         </div>
       )}
-
       {account && !onArc && (
         <div className="banner error">
           <span>
             Your wallet is connected to another network.
             Switch to {arcChain.name} to continue.
           </span>
-
           <button
             className="primary"
             type="button"
@@ -567,23 +512,19 @@ export default function App() {
           </button>
         </div>
       )}
-
       <TokenizeForm
         disabled={!canWrite}
         onSubmit={tokenize}
       />
-
       <section className="listing">
         <div className="listing-head">
           <div>
             <h2>Homes</h2>
-
             <p className="hint">
               Browse homes by location, 3 Word Address,
               or home ID.
             </p>
           </div>
-
           <input
             className="filter"
             placeholder="Search homes, locations or 3 Word Address"
@@ -593,19 +534,16 @@ export default function App() {
             }
           />
         </div>
-
         {loading && (
           <p className="empty">
             Loading homes from {arcChain.name}...
           </p>
         )}
-
         {loadError && (
           <p className="empty">
             Could not read HomeRegistry: {loadError}
           </p>
         )}
-
         {!loading &&
           !loadError &&
           homes.length === 0 && (
@@ -613,7 +551,6 @@ export default function App() {
               No homes yet. Register the first one above.
             </p>
           )}
-
         {!loading &&
           homes.length > 0 &&
           visible.length === 0 && (
@@ -621,7 +558,6 @@ export default function App() {
               Nothing matches "{filter}".
             </p>
           )}
-
         {visible.map((home) => (
           <HomeCard
             key={home.id.toString()}
@@ -638,14 +574,12 @@ export default function App() {
           />
         ))}
       </section>
-
       <footer>
         <p>
           Home RWA records are not legal title to real
           property. Always verify property information
           independently.
         </p>
-
         {isDeployed && (
           <p>
             HomeRegistry:{" "}
