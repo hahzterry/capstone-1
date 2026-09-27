@@ -1,145 +1,194 @@
 import {
   createPublicClient,
-  createWalletClient,
-  custom,
   http,
 } from "viem";
-import type { EIP1193Provider } from "viem";
+import type {
+  Address,
+} from "viem";
 import { arcChain } from "./chain";
-
-declare global {
-  interface Window {
-    ethereum?: EIP1193Provider;
-  }
-}
-
-/**
- * Public read only client.
- *
- * The chain is selected by VITE_ARC_NETWORK:
- *
- * VITE_ARC_NETWORK=testnet
- * VITE_ARC_NETWORK=mainnet
- */
 export const publicClient = createPublicClient({
   chain: arcChain,
   transport: http(),
 });
-
-export class NoWalletError extends Error {
-  constructor() {
-    super(
-      "No injected wallet found. Install MetaMask or another compatible wallet."
+export class CircleWalletError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CircleWalletError";
+  }
+}
+let circleSdk: any = null;
+let circleAddress: Address | undefined;
+let circleChainId: number | undefined;
+function getCircleAppId(): string {
+  const appId = (
+    import.meta.env.VITE_CIRCLE_APP_ID ?? ""
+  ).trim();
+  if (!appId) {
+    throw new CircleWalletError(
+      "Circle wallet is not configured. Set VITE_CIRCLE_APP_ID."
     );
-
-    this.name = "NoWalletError";
   }
+  return appId;
 }
-
-export class WrongNetworkError extends Error {
-  constructor() {
-    super(`Wallet must be connected to ${arcChain.name}.`);
-
-    this.name = "WrongNetworkError";
-  }
-}
-
 /**
- * Returns the browser injected wallet provider.
+ * Lazily initialize Circle's Web SDK.
+ *
+ * The SDK is intentionally loaded only in the browser.
  */
-function getInjectedProvider(): EIP1193Provider {
+export async function getCircleSdk(): Promise<any> {
   if (typeof window === "undefined") {
-    throw new NoWalletError();
+    throw new CircleWalletError(
+      "Circle wallet is only available in the browser."
+    );
   }
-
-  const injected = window.ethereum;
-
-  if (!injected) {
-    throw new NoWalletError();
+  if (circleSdk) {
+    return circleSdk;
   }
-
-  return injected;
-}
-
-/**
- * Create a wallet client using the user's injected wallet.
- */
-export function getWalletClient() {
-  const injected = getInjectedProvider();
-
-  return createWalletClient({
-    chain: arcChain,
-    transport: custom(injected),
+  const module = await import(
+    "@circle-fin/w3s-pw-web-sdk"
+  );
+  const W3SSdk = module.W3SSdk;
+  circleSdk = new W3SSdk({
+    appSettings: {
+      appId: getCircleAppId(),
+    },
   });
+  /*
+   * Circle requires getDeviceId() after initialization
+   * to establish the SDK session.
+   */
+  if (
+    typeof circleSdk.getDeviceId === "function"
+  ) {
+    await circleSdk.getDeviceId();
+  }
+  return circleSdk;
 }
-
 /**
- * Check whether an injected browser wallet exists.
+ * Store the authenticated Circle wallet address.
+ */
+export function setCircleWallet(
+  address: Address,
+  chainId?: number,
+) {
+  circleAddress = address;
+  if (chainId !== undefined) {
+    circleChainId = chainId;
+  }
+}
+/**
+ * Clear the local wallet state.
+ */
+export function clearCircleWallet() {
+  circleAddress = undefined;
+  circleChainId = undefined;
+}
+/**
+ * Return the Circle wallet address.
+ */
+export function getCircleAddress():
+  | Address
+  | undefined {
+  return circleAddress;
+}
+/**
+ * Return the Circle wallet chain.
+ */
+export function getCircleChainId():
+  | number
+  | undefined {
+  return circleChainId;
+}
+/**
+ * Circle is now the primary wallet.
  */
 export function hasWallet(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    Boolean(window.ethereum)
-  );
+  return Boolean(circleAddress);
 }
-
 /**
- * Get the wallet's currently connected chain ID.
+ * Return the currently connected wallet.
+ */
+export async function requestAccounts(): Promise<
+  Address[]
+> {
+  if (!circleAddress) {
+    throw new CircleWalletError(
+      "Connect your Circle wallet first."
+    );
+  }
+  return [circleAddress];
+}
+/**
+ * Return the connected chain.
  */
 export async function getWalletChainId(): Promise<number> {
-  const injected = getInjectedProvider();
-
-  const chainId = await injected.request({
-    method: "eth_chainId",
-  });
-
-  return Number.parseInt(chainId, 16);
+  if (circleChainId !== undefined) {
+    return circleChainId;
+  }
+  return arcChain.id;
 }
-
 /**
- * Check whether the connected wallet is on the
- * currently configured Arc network.
+ * Circle wallet is configured for Arc.
  */
 export async function isCorrectNetwork(): Promise<boolean> {
-  try {
-    const chainId = await getWalletChainId();
-
-    return chainId === arcChain.id;
-  } catch {
-    return false;
-  }
+  return (
+    getCircleChainId() === undefined ||
+    getCircleChainId() === arcChain.id
+  );
 }
-
 /**
- * Ask the wallet to switch to the configured Arc network.
+ * Circle wallets do not use window.ethereum.
  *
- * The actual chain configuration comes from chain.ts,
- * so the frontend cannot accidentally switch to a
- * hardcoded testnet while production is configured
- * for mainnet.
+ * Network selection is handled by the Circle wallet
+ * configuration / transaction flow.
  */
 export async function switchToArc() {
-  const injected = getInjectedProvider();
-
-  await injected.request({
-    method: "wallet_switchEthereumChain",
-    params: [
-      {
-        chainId: `0x${arcChain.id.toString(16)}`,
+  circleChainId = arcChain.id;
+}
+/**
+ * Execute a Circle challenge.
+ *
+ * The challenge must be created by your secure backend.
+ */
+export async function executeCircleChallenge(
+  challengeId: string,
+): Promise<any> {
+  const sdk = await getCircleSdk();
+  return new Promise((resolve, reject) => {
+    sdk.execute(
+      challengeId,
+      (
+        error: any,
+        result: any,
+      ) => {
+        if (error) {
+          reject(
+            new CircleWalletError(
+              error?.message ??
+                "Circle wallet operation failed."
+            ),
+          );
+          return;
+        }
+        resolve(result);
       },
-    ],
+    );
   });
 }
-
 /**
- * Request the user's wallet accounts.
+ * Return the Circle wallet address as the
+ * transaction sender.
+ *
+ * NOTE:
+ * Actual signing must be performed through a
+ * Circle-created challenge. This intentionally does
+ * not expose or fabricate a private key.
  */
-export async function requestAccounts(): Promise<`0x${string}`[]> {
-  const injected = getInjectedProvider();
-
-  const accounts = await injected.request({
-    method: "eth_requestAccounts",
-  });
-
-  return accounts as `0x${string}`[];
+export function requireCircleAddress(): Address {
+  if (!circleAddress) {
+    throw new CircleWalletError(
+      "Connect your Circle wallet first."
+    );
+  }
+  return circleAddress;
 }
