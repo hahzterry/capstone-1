@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@circle-fin/w3s-pw-web-sdk": "^1.1.11",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "viem": "^2.55.15"
@@ -24,3 +25,5 @@
     "vite": "^8.2.0"
   }
 }
+
+Circle’s published Web SDK is 1.1.11. (npm)
